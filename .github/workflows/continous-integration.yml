@@ -156,7 +156,7 @@ jobs:
       run: poetry run coveralls
 
   docker:
-    name: Build Docker Containers
+    name: Build Docker Container
     runs-on: ubuntu-latest
 
     strategy:
@@ -171,7 +171,7 @@ jobs:
     - name: Checkout git repository 🕝
       uses: actions/checkout@v2
 
-    - name: Build Full Container
+    - name: Build ${{ matrix.image.tag }} Container
       uses: whoan/docker-build-with-cache-action@v4
       with:
         username: "${{ secrets.DOCKER_USERNAME }}"
