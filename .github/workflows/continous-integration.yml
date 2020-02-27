@@ -155,6 +155,32 @@ jobs:
         COVERALLS_SERVICE_NAME: github
       run: poetry run coveralls
 
+  docker:
+    name: Build Docker Containers
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        image:
+          - {"file": "docker/Dockerfile_full", "tag": "latest-full"}
+          - {"file": "docker/Dockerfile_pretrained_embeddings_mitie_en", "tag": "latest-mitie-en"}
+          - {"file": "docker/Dockerfile_pretrained_embeddings_spacy_de", "tag": "latest-spacy-de"}
+          - {"file": "docker/Dockerfile_pretrained_embeddings_spacy_en", "tag": "latest-spacy-en"}
+
+    steps:
+    - name: Checkout git repository 🕝
+      uses: actions/checkout@v2
+
+    - name: Build Full Container
+      uses: whoan/docker-build-with-cache-action@v4
+      with:
+        username: "${{ secrets.DOCKER_USERNAME }}"
+        password: "${{ secrets.DOCKER_PASSWORD }}"
+        image_name: rasahq/rasa
+        dockerfile: ${{ matrix.image.file }}
+        image_tag: ${{ matrix.image.tag }}
+        push_image_and_stages: false
+
   deploy:
     name: Deploy to PyPI
     runs-on: ubuntu-latest
