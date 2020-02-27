@@ -162,24 +162,31 @@ jobs:
     strategy:
       matrix:
         image:
-          - {"file": "docker/Dockerfile_full", "tag": "latest-full"}
-          - {"file": "docker/Dockerfile_pretrained_embeddings_mitie_en", "tag": "latest-mitie-en"}
-          - {"file": "docker/Dockerfile_pretrained_embeddings_spacy_de", "tag": "latest-spacy-de"}
-          - {"file": "docker/Dockerfile_pretrained_embeddings_spacy_en", "tag": "latest-spacy-en"}
+          - {"file": "Dockerfile", "tag_ext": ""}
+          - {"file": "docker/Dockerfile_full", "tag_ext": "-full"}
+          - {"file": "docker/Dockerfile_pretrained_embeddings_mitie_en", "tag_ext": "-mitie-en"}
+          - {"file": "docker/Dockerfile_pretrained_embeddings_spacy_de", "tag_ext": "-spacy-de"}
+          - {"file": "docker/Dockerfile_pretrained_embeddings_spacy_en", "tag_ext": "-spacy-en"}
 
     steps:
     - name: Checkout git repository 🕝
       uses: actions/checkout@v2
 
-    - name: Build ${{ matrix.image.tag }} Container
-      uses: whoan/docker-build-with-cache-action@v4
-      with:
-        username: "${{ secrets.DOCKER_USERNAME }}"
-        password: "${{ secrets.DOCKER_PASSWORD }}"
-        image_name: rasahq/rasa
-        dockerfile: ${{ matrix.image.file }}
-        image_tag: ${{ matrix.image.tag }}
-        push_image_and_stages: false
+    - name: Login to DockerHub Registry
+      run: echo ${{ secrets.DOCKERHUB_PASSWORD }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+    - name: Build latest-${{ matrix.image.tag_ext }} Docker image
+      run: docker build . --file ${{ matrix.image.file }} --tag rasahq/rasa:latest${{ matrix.image.tag_ext }}
+
+    - name: Push the Docker image with latest tag
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      run: docker push rasahq/rasa:latest${{ matrix.image.tag_ext }}
+
+    - name: Push the Docker image with ${{github.event.ref}} tag
+      if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
+      run: |
+        docker tag rasahq/rasa:latest${{ matrix.image.tag_ext }} rasahq/rasa:${{github.event.ref}}${{ matrix.image.tag_ext }}
+        docker push rasahq/rasa:${{github.event.ref}}${{ matrix.image.tag_ext }}
 
   deploy:
     name: Deploy to PyPI
@@ -187,7 +194,7 @@ jobs:
 
     # deploy will only be run when there is a tag available
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
-    needs: [quality, test, api]     # only run after all other stages succeeded
+    needs: [quality, test, api, docker]  # only run after all other stages succeeded
 
     steps:
     - name: Checkout git repository 🕝
@@ -221,7 +228,7 @@ jobs:
       env:
         GH_RELEASE_NOTES_TOKEN: ${{ secrets.GH_RELEASE_NOTES_TOKEN }}
         SLACK_WEBHOOK_TOKEN: ${{ secrets.SLACK_WEBHOOK_TOKEN }}
-        GITHUB_TAG: ${{ github.ref }}
+        GITHUB_TAG: ${{ github.event.ref }}
         GITHUB_REPO_SLUG: ${{ github.repository }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
